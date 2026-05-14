@@ -1,0 +1,22 @@
+# Node modules
+node_modules/
+
+# Logs
+*.log
+
+# Environment variables
+.env
+
+# Build folders
+dist/
+build/
+
+# VS Code
+.vscode/
+
+# Vercel
+.vercel/
+
+# OS files
+.DS_Store
+Thumbs.dbgit status
