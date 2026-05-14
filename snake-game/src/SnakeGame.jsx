@@ -6,6 +6,12 @@ const CELL = 22
 const W = COLS * CELL
 const H = ROWS * CELL
 
+const DIFFICULTIES = {
+  easy: { label: 'Easy', speed: 280 },
+  hard: { label: 'Hard', speed: 140 },
+  pro:  { label: 'Pro',  speed: 55  },
+}
+
 function randPos(exclude) {
   let pos
   do {
@@ -37,8 +43,6 @@ const dpadBtnStyle = {
 export default function SnakeGame() {
   const canvasRef = useRef(null)
 
-  // All mutable game state lives in a ref so canvas callbacks
-  // don't go stale between renders
   const s = useRef({
     snake: [],
     dir: { x: 1, y: 0 },
@@ -49,10 +53,11 @@ export default function SnakeGame() {
     paused: false,
     score: 0,
     level: 1,
-    speed: 140,
+    speed: 280,
     timer: null,
   })
 
+  const [difficulty, setDifficulty] = useState('easy')
   const [ui, setUi] = useState({ score: 0, best: 0, level: 1, screen: 'start' })
 
   // ─── Drawing ─────────────────────────────────────────────────────────────
@@ -72,11 +77,9 @@ export default function SnakeGame() {
       food:   dark ? '#f0997b' : '#d85a30',
     }
 
-    // Background
     ctx.fillStyle = p.bg
     ctx.fillRect(0, 0, W, H)
 
-    // Grid
     ctx.strokeStyle = p.grid
     ctx.lineWidth = 0.5
     for (let c = 0; c <= COLS; c++) {
@@ -86,7 +89,6 @@ export default function SnakeGame() {
       ctx.beginPath(); ctx.moveTo(0, r * CELL); ctx.lineTo(W, r * CELL); ctx.stroke()
     }
 
-    // Food
     const fx = food.x * CELL + CELL / 2
     const fy = food.y * CELL + CELL / 2
     const fr = CELL * 0.38
@@ -95,7 +97,6 @@ export default function SnakeGame() {
     ctx.beginPath(); ctx.arc(fx - fr * 0.3, fy - fr * 0.3, fr * 0.28, 0, Math.PI * 2)
     ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fill()
 
-    // Snake body
     snake.forEach((seg, i) => {
       const x = seg.x * CELL, y = seg.y * CELL
       ctx.beginPath()
@@ -106,7 +107,6 @@ export default function SnakeGame() {
       ctx.globalAlpha = 1
     })
 
-    // Snake eyes
     if (snake.length > 0) {
       const head = snake[0]
       const { x: dx, y: dy } = dir
@@ -123,7 +123,6 @@ export default function SnakeGame() {
       })
     }
 
-    // Particles
     s.current.particles = particles.filter(pt => pt.life > 0.05)
     s.current.particles.forEach(pt => {
       ctx.beginPath(); ctx.arc(pt.x, pt.y, 3 * pt.life, 0, Math.PI * 2)
@@ -153,7 +152,6 @@ export default function SnakeGame() {
     g.dir = g.nextDir
     const head = { x: g.snake[0].x + g.dir.x, y: g.snake[0].y + g.dir.y }
 
-    // Collision check
     if (
       head.x < 0 || head.x >= COLS ||
       head.y < 0 || head.y >= ROWS ||
@@ -167,10 +165,8 @@ export default function SnakeGame() {
     if (head.x === g.food.x && head.y === g.food.y) {
       g.score++
       g.level = Math.floor(g.score / 5) + 1
-      g.speed = Math.max(55, 140 - (g.level - 1) * 12)
       g.food = randPos(g.snake)
 
-      // Burst particles at food position
       const px = head.x * CELL + CELL / 2
       const py = head.y * CELL + CELL / 2
       for (let i = 0; i < 8; i++) {
@@ -194,27 +190,28 @@ export default function SnakeGame() {
   // ─── Start / Restart ─────────────────────────────────────────────────────
   const startGame = useCallback(() => {
     const g = s.current
+    const preset = DIFFICULTIES[difficulty]
     const cx = Math.floor(COLS / 2), cy = Math.floor(ROWS / 2)
     g.snake = [
       { x: cx,     y: cy },
       { x: cx - 1, y: cy },
       { x: cx - 2, y: cy },
     ]
-    g.dir      = { x: 1, y: 0 }
-    g.nextDir  = { x: 1, y: 0 }
-    g.score    = 0
-    g.level    = 1
-    g.speed    = 140
+    g.dir       = { x: 1, y: 0 }
+    g.nextDir   = { x: 1, y: 0 }
+    g.score     = 0
+    g.level     = 1
+    g.speed     = preset.speed
     g.particles = []
-    g.running  = true
-    g.paused   = false
-    g.food     = randPos(g.snake)
+    g.running   = true
+    g.paused    = false
+    g.food      = randPos(g.snake)
 
     setUi(prev => ({ ...prev, score: 0, level: 1, screen: 'playing' }))
     clearTimeout(g.timer)
     draw()
     g.timer = setTimeout(step, g.speed)
-  }, [draw, step])
+  }, [draw, step, difficulty])
 
   // ─── Keyboard Controls ───────────────────────────────────────────────────
   useEffect(() => {
@@ -309,13 +306,45 @@ export default function SnakeGame() {
               letterSpacing: '0.05em', margin: 0,
             }}>
               {ui.screen === 'start'
-                ? 'eat • grow • don\'t crash'
+                ? "eat • grow • don't crash"
                 : `Score: ${ui.score}  •  Best: ${ui.best}`}
             </p>
+
+            {/* Difficulty selector */}
+            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+              {Object.entries(DIFFICULTIES).map(([key, val]) => (
+                <button
+                  key={key}
+                  onClick={() => setDifficulty(key)}
+                  style={{
+                    fontFamily: "'Share Tech Mono', monospace",
+                    fontSize: 12,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    padding: '6px 14px',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    border: difficulty === key
+                      ? '1px solid #fff'
+                      : '1px solid rgba(255,255,255,0.25)',
+                    background: difficulty === key
+                      ? 'rgba(255,255,255,0.18)'
+                      : 'transparent',
+                    color: difficulty === key
+                      ? '#fff'
+                      : 'rgba(255,255,255,0.5)',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {val.label}
+                </button>
+              ))}
+            </div>
+
             <button
               onClick={startGame}
               style={{
-                marginTop: 6,
+                marginTop: 2,
                 fontFamily: "'Share Tech Mono', monospace",
                 fontSize: 14, letterSpacing: '0.1em',
                 textTransform: 'uppercase',
